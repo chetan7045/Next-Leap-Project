@@ -20,6 +20,20 @@ from prisma import Prisma  # noqa: E402
 from app.main import app  # noqa: E402
 
 
+async def _connect_with_retry(db: Prisma, attempts: int = 4) -> None:
+    """Neon's pooled serverless connection can cold-start; retry briefly."""
+    import asyncio
+
+    for attempt in range(attempts):
+        try:
+            await db.connect()
+            return
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            await asyncio.sleep(0.5 * (attempt + 1))
+
+
 @pytest.fixture(scope="session")
 def client():
     with TestClient(app) as test_client:
@@ -34,7 +48,7 @@ def test_restaurant(client):
     import asyncio
 
     async def _run() -> None:
-        await db.connect()
+        await _connect_with_retry(db)
         await db.restaurant.create(
             data={
                 "id": restaurant_id,
@@ -52,7 +66,7 @@ def test_restaurant(client):
     yield restaurant_id
 
     async def _cleanup() -> None:
-        await db.connect()
+        await _connect_with_retry(db)
         await db.review.delete_many(where={"restaurantId": restaurant_id})
         await db.restaurant.delete(where={"id": restaurant_id})
         await db.disconnect()
