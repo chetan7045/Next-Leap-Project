@@ -1,0 +1,43 @@
+// Rasa — Prisma schema (source of truth for the database)
+//
+// Models:
+//   Restaurant → Review  (1:N)
+//   Review.restaurantId → Restaurant.id (onDelete: Restrict)
+
+generator client {
+  provider  = "prisma-client-py"
+  output    = "../app/generated/prisma"
+  interface = "asyncio"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Restaurant {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  cuisines    String[]
+  location    String
+  city        String
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviews     Review[]
+}
+
+model Review {
+  id           String     @id @default(uuid()) @db.Uuid
+  restaurantId String     @db.Uuid
+  rating       Int
+  review       String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  @@index([restaurantId])
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, rating])
+}
